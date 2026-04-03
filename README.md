@@ -16,24 +16,24 @@ Our system utilizes the **Supervisor Pattern** via LangGraph, hosted entirely wi
 ```mermaid
 graph TD
     %% Define Nodes
-    UI[🖥️ Web Dashboard <br/> Cloud Run / FastAPI]
-    Cron[⏰ Cloud Scheduler <br/> 5:00 AM Trigger]
+    UI[Web Dashboard <br/> Cloud Run / FastAPI]
+    Cron[Cloud Scheduler <br/> 5:00 AM Trigger]
     
     subgraph "The Brain (Vertex AI & LangGraph)"
-        Orchestrator{🧠 Master Concierge <br/> Gemini 1.5 Pro}
-        Transit[✈️ Transit Agent <br/> Gemini 1.5 Flash]
-        Planning[📅 Planning Agent <br/> Gemini 1.5 Flash]
-        Intel[📰 Local Intel Agent <br/> Gemini 1.5 Flash]
+        Orchestrator{Master Concierge <br/> Gemini 1.5 Pro}
+        Transit[Transit Agent <br/> Gemini 1.5 Flash]
+        Planning[Planning Agent <br/> Gemini 1.5 Flash]
+        Intel[Local Intel Agent <br/> Gemini 1.5 Flash]
     end
 
     subgraph "The Memory"
-        DB[(🗄️ Cloud SQL <br/> PostgreSQL + pgvector)]
+        DB[(Cloud SQL <br/> PostgreSQL + pgvector)]
     end
 
     subgraph "The Hands (MCP / Tools)"
-        Maps((🗺️ Google Maps API))
-        Search((🔍 Google Search API))
-        Weather((⛅ Weather/Flight APIs))
+        Maps((Google Maps API))
+        Search((Google Search API))
+        Weather((Weather/Flight APIs))
     end
 
     %% Define Connections
@@ -53,7 +53,8 @@ graph TD
     Planning <-->|Semantic Search| DB
 ```
 
-## ## ✨ Core Features
+## ✨ Core Features
+
 The 5:00 AM Proactive Run: Powered by Google Cloud Scheduler, the system wakes up at 5:00 AM daily, checks real-time global APIs against the user's itinerary, makes autonomous adjustments, and generates a synthesized Morning Briefing before the user wakes up.
 
 Deterministic Preference Engine: TravellerPie does not hallucinate recommendations. It uses pgvector in Cloud SQL to semantically match real-time indoor/outdoor activities against the user's stored onboarding preferences (e.g., swapping a park for an indoor bouldering gym if it rains, based on a fitness preference).
@@ -61,15 +62,16 @@ Deterministic Preference Engine: TravellerPie does not hallucinate recommendatio
 Multi-Agent Tool Use (MCP): Specialized Gemini 1.5 Flash sub-agents independently execute API calls to Google Maps, Custom Search, and Transit endpoints, reporting back to the Gemini 1.5 Pro Orchestrator.
 
 ## 🛠️ Tech Stack
-Frontend & API: FastAPI, HTML/CSS (Tailwind CSS), deployed serverless via Google Cloud Run.
 
-AI Orchestration: Vertex AI Reasoning Engine, LangGraph, LangChain.
+1. **Frontend & API:** FastAPI, HTML/CSS (Tailwind CSS), deployed serverless via Google Cloud Run.
 
-Core Models: Gemini 1.5 Pro (Reasoning) and Gemini 1.5 Flash (Tool Execution).
+2. **AI Orchestration:** Vertex AI Reasoning Engine, LangGraph, LangChain.
 
-Database: Cloud SQL for PostgreSQL (with pgvector for semantic memory).
+3. **Core Models:** Gemini 1.5 Pro (Reasoning) and Gemini 1.5 Flash (Tool Execution).
 
-Automation: Google Cloud Scheduler.
+4. **Database:** Cloud SQL for PostgreSQL (with pgvector for semantic memory).
+
+5. **Automation:** Google Cloud Scheduler.
 
 ## 📂 Repository Structure
 
@@ -129,8 +131,9 @@ uvicorn app.main:app --reload
 Navigate to http://localhost:8000 to view the TravellerPie dashboard.
 
 ## 👥 The Team
+
 Built for the Google Gen AI Academy APAC Edition Cohort 1 Hackathon.
 
-Vaishnavi - AI Architecture, LangGraph Routing, Cloud SQL/pgvector
+#### Vaishnavi - AI Architecture, LangGraph Routing, Cloud SQL/pgvector
 
-Rahul Selvakumar- Cloud Run Deployment, Frontend UI, Tool Integrations & MCP
+#### Rahul Selvakumar- Cloud Run Deployment, Frontend UI, Tool Integrations & MCP
