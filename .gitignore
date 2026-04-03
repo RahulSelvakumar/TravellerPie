@@ -1,0 +1,14 @@
+# Environments
+venv/
+env/
+.venv/
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Secrets (NEVER push API keys)
+.env
+
+# OS generated files
+.DS_Store
