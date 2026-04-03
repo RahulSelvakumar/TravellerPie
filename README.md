@@ -1,9 +1,6 @@
 # TravellerPie 🥧
 **The Hyper-Dynamic Travel & Logistics Orchestrator**
 
-[![Built on GCP](https://img.shields.io/badge/Built%20on-Google%20Cloud-4285F4?style=for-the-badge&logo=google-cloud)](https://cloud.google.com/)
-[![Powered by Gemini](https://img.shields.io/badge/Powered%20by-Gemini%201.5-8E75B2?style=for-the-badge)](https://deepmind.google/technologies/gemini/)
-
 ## 🌍 The Problem
 Planning and executing a complex, multi-city trip or living as a digital nomad involves constantly shifting variables. A single delayed flight can ruin train connections, hotel bookings, and tour reservations, requiring hours of stressful phone calls in foreign languages. 
 
@@ -54,15 +51,16 @@ graph TD
     Intel <-->|Tool Call| Maps
 
     Planning <-->|Semantic Search| DB
+```
 
-✨ Core Features
+## ## ✨ Core Features
 The 5:00 AM Proactive Run: Powered by Google Cloud Scheduler, the system wakes up at 5:00 AM daily, checks real-time global APIs against the user's itinerary, makes autonomous adjustments, and generates a synthesized Morning Briefing before the user wakes up.
 
 Deterministic Preference Engine: TravellerPie does not hallucinate recommendations. It uses pgvector in Cloud SQL to semantically match real-time indoor/outdoor activities against the user's stored onboarding preferences (e.g., swapping a park for an indoor bouldering gym if it rains, based on a fitness preference).
 
 Multi-Agent Tool Use (MCP): Specialized Gemini 1.5 Flash sub-agents independently execute API calls to Google Maps, Custom Search, and Transit endpoints, reporting back to the Gemini 1.5 Pro Orchestrator.
 
-🛠️ Tech Stack
+## 🛠️ Tech Stack
 Frontend & API: FastAPI, HTML/CSS (Tailwind CSS), deployed serverless via Google Cloud Run.
 
 AI Orchestration: Vertex AI Reasoning Engine, LangGraph, LangChain.
@@ -73,8 +71,9 @@ Database: Cloud SQL for PostgreSQL (with pgvector for semantic memory).
 
 Automation: Google Cloud Scheduler.
 
-📂 Repository Structure
-Plaintext
+## 📂 Repository Structure
+
+```
 TravellerPie/
 │
 ├── app/                  # The Body (Web UI & API)
@@ -93,16 +92,17 @@ TravellerPie/
 ├── Dockerfile            # Cloud Run containerization instructions
 ├── requirements.txt      # Python dependencies
 └── README.md             # Project documentation
-🚀 Local Development Setup
-1. Prerequisites
-Python 3.11+
+```
 
-Google Cloud CLI (gcloud) installed
+## 🚀 Local Development Setup
 
-A Google Cloud Project with Billing Enabled
+### 1. Prerequisites
+- Python 3.11+
+- Google Cloud CLI (gcloud) installed
+- A Google Cloud Project with Billing Enabled
 
-2. Clone and Install
-Bash
+### 2. Clone and Install
+```bash
 git clone https://github.com/your-username/TravellerPie.git
 cd TravellerPie
 
@@ -112,19 +112,24 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
-3. Google Cloud Authentication
+```
+
+### 3. Google Cloud Authentication
 You must authenticate your local machine to allow the Python code to interact with Vertex AI.
 
-Bash
+```bash
 gcloud init
 gcloud auth application-default login
-4. Run the Development Server
-Bash
+```
+
+### 4. Run the Development Server
+```bash
 uvicorn app.main:app --reload
+```
 Navigate to http://localhost:8000 to view the TravellerPie dashboard.
 
-👥 The Team
-Built for the Google Gen AI APAC Academy Hackathon.
+## 👥 The Team
+Built for the Google Gen AI Academy APAC Edition Cohort 1 Hackathon.
 
 Vaishnavi - AI Architecture, LangGraph Routing, Cloud SQL/pgvector
 
