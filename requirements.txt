@@ -1,0 +1,6 @@
+langchain-google-vertexai
+langgraph
+langchain
+google-cloud-aiplatform
+fastapi
+uvicorn
