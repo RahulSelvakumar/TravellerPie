@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TravellerPie</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 p-10 font-sans text-slate-800">
+    <div class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-lg border-t-4 border-indigo-600">
+        <h1 class="text-4xl font-extrabold mb-2 tracking-tight">TravellerPie 🥧</h1>
+        <p class="text-slate-500 mb-8 font-medium">Your Hyper-Dynamic Travel Orchestrator</p>
+        
+        <div class="relative">
+            <input type="text" id="prompt" placeholder="E.g., Plan a rainy afternoon in Tokyo..." 
+                   class="w-full p-4 border border-slate-200 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-lg">
+            <button id="generateBtn" onclick="planTrip()" class="w-full bg-indigo-600 text-white p-4 rounded-lg font-bold hover:bg-indigo-700 transition shadow-md text-lg">
+                Generate Itinerary
+            </button>
+        </div>
+
+        <div id="results" class="mt-10 hidden">
+            <h2 class="text-2xl font-bold border-b-2 border-slate-100 pb-2 mb-4">Morning Briefing</h2>
+            <p id="briefing" class="text-slate-700 italic bg-indigo-50 p-5 rounded-lg border border-indigo-100 shadow-inner text-lg"></p>
+            
+            <h2 class="text-2xl font-bold border-b-2 border-slate-100 pb-2 mt-8 mb-4">Live Timeline</h2>
+            <ul id="timeline" class="space-y-4"></ul>
+        </div>
+    </div>
+
+    <script>
+        async function planTrip() {
+            const promptInput = document.getElementById('prompt');
+            const button = document.getElementById('generateBtn');
+            const resultsDiv = document.getElementById('results');
+            
+            // UI Polish: The "Wow" Factor Loading State
+            button.innerText = "Agents are orchestrating... 🧠";
+            button.disabled = true;
+            button.classList.add('opacity-70', 'cursor-not-allowed', 'animate-pulse');
+            
+            resultsDiv.classList.remove('hidden');
+            document.getElementById('briefing').innerText = "Running multi-agent triage. Fetching local weather and transit data...";
+            document.getElementById('timeline').innerHTML = "";
+
+            try {
+                // Call the FastAPI backend
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: promptInput.value })
+                });
+                
+                const data = await response.json();
+                
+                // Render the results
+                if(data.status === "success") {
+                    document.getElementById('briefing').innerText = data.morning_briefing;
+                    data.itinerary.forEach(item => {
+                        document.getElementById('timeline').innerHTML += `
+                            <li class="flex items-center bg-white border border-slate-200 p-4 rounded-lg shadow-sm transform transition hover:-translate-y-1 hover:shadow-md">
+                                <span class="font-bold text-indigo-600 w-28 text-lg">${item.time}</span>
+                                <span class="text-slate-800 text-lg font-medium">${item.event}</span>
+                            </li>
+                        `;
+                    });
+                }
+            } catch (error) {
+                document.getElementById('briefing').innerText = "Error connecting to the orchestrator.";
+            } finally {
+                // Reset button
+                button.innerText = "Generate Itinerary";
+                button.disabled = false;
+                button.classList.remove('opacity-70', 'cursor-not-allowed', 'animate-pulse');
+            }
+        }
+    </script>
+</body>
+</html>
