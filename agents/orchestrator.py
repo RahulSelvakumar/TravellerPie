@@ -17,7 +17,7 @@ class AgentState(TypedDict):
     next: str 
 
 # 2. Define the Nodes
-from .sub_agents import TravellerSubAgents
+from agents.sub_agents import TravellerSubAgents
 sub_agents = TravellerSubAgents()
 # Using 2.5-flash as requested, temperature 0 is key for JSON consistency
 supervisor_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)

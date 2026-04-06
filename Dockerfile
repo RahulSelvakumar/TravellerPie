@@ -29,7 +29,5 @@ COPY . .
 ENV PORT=8080
 EXPOSE 8080
 
-# 9. Start Uvicorn with optimized settings for Cloud Run
-# - host 0.0.0.0: Required for Cloud Run to route traffic
-# - timeout-keep-alive 0: Prevents the TCP probe from failing during long AI imports
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1 --timeout-keep-alive 0"]
+# Command to run the FastAPI app
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
