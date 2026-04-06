@@ -1,29 +1,13 @@
-# tools/transit_api.py
+import requests
+import os
 
-def check_transit_status(flight_or_train_number: str) -> dict:
-    """
-    Checks the real-time status of a transit vehicle.
-    (Simulated for hackathon reliability).
-    """
-    # DEMO TRIGGER: If the AI checks this specific flight, force a delay to show off the system's pivot capability!
-    if flight_or_train_number.upper() == "DELAY-123":
-        return {
-            "transit_id": flight_or_train_number,
-            "status": "Delayed",
-            "delay_duration": "3 Hours",
-            "reason": "Severe weather at destination",
-            "new_arrival_time": "23:00 PM (Requires late hotel check-in)"
-        }
-        
-    # Normal status for everything else
-    return {
-        "transit_id": flight_or_train_number,
-        "status": "On Time",
-        "delay_duration": "0 Minutes",
-        "reason": "N/A",
-        "new_arrival_time": "As Scheduled"
-    }
-
-if __name__ == "__main__":
-    print(check_transit_status("DELAY-123"))
-    print(check_transit_status("FLIGHT-999"))
+def get_real_google_flights(origin, destination, date):
+    api_key = os.getenv("GOOGLE_CLOUD_API_KEY")
+    search_engine_id = os.getenv("GOOGLE_SEARCH_ENGINE_ID")
+    query = f"flights from {origin} to {destination} on {date}"
+    
+    url = f"https://www.googleapis.com/customsearch/v1?key={api_key}&cx={search_engine_id}&q={query}"
+    
+    response = requests.get(url).json()
+    # The agent will parse 'items' to find flight numbers and prices
+    return response.get('items', [])
