@@ -67,5 +67,5 @@ async def generate_itinerary(request: Request):
 if __name__ == "__main__":
     import uvicorn
     # Use PORT from environment (Cloud Run requirement)
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
