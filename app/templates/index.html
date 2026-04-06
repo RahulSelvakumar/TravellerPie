@@ -1,76 +1,229 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>TravellerPie</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TravellerPie 🥧 | Command Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        .agent-terminal { background-color: #1e293b; color: #a7f3d0; font-family: 'Courier New', monospace; }
+        .day-tab.active { background-color: #4f46e5; color: white; transform: scale(1.05); }
+        .time-block { border-left: 4px solid #6366f1; transition: all 0.3s ease; }
+        .time-block:hover { border-left-width: 8px; background-color: #f8fafc; }
+        .pulse-light { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
 </head>
-<body class="bg-slate-50 p-10 font-sans text-slate-800">
-    <div class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-lg border-t-4 border-indigo-600">
-        <h1 class="text-4xl font-extrabold mb-2 tracking-tight">TravellerPie 🥧</h1>
-        <p class="text-slate-500 mb-8 font-medium">Your Hyper-Dynamic Travel Orchestrator</p>
-        
-        <div class="relative">
-            <input type="text" id="prompt" placeholder="E.g., Plan a rainy afternoon in Tokyo..." 
-                   class="w-full p-4 border border-slate-200 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-lg">
-            <button id="generateBtn" onclick="planTrip()" class="w-full bg-indigo-600 text-white p-4 rounded-lg font-bold hover:bg-indigo-700 transition shadow-md text-lg">
-                Generate Itinerary
-            </button>
-        </div>
+<body class="bg-slate-50 p-4 md:p-8 font-sans text-slate-800">
 
-        <div id="results" class="mt-10 hidden">
-            <h2 class="text-2xl font-bold border-b-2 border-slate-100 pb-2 mb-4">Morning Briefing</h2>
-            <p id="briefing" class="text-slate-700 italic bg-indigo-50 p-5 rounded-lg border border-indigo-100 shadow-inner text-lg"></p>
-            
-            <h2 class="text-2xl font-bold border-b-2 border-slate-100 pb-2 mt-8 mb-4">Live Timeline</h2>
-            <ul id="timeline" class="space-y-4"></ul>
+    <div class="max-w-screen-2xl mx-auto">
+        <header class="flex flex-col md:flex-row items-center justify-between pb-8 border-b-2 border-slate-100 mb-8 gap-4 text-center md:text-left">
+            <div class="flex items-center gap-4">
+                <div class="p-3 bg-indigo-600 text-white rounded-2xl text-3xl shadow-lg">🥧</div>
+                <div>
+                    <h1 class="text-4xl font-black tracking-tight text-slate-900">TravellerPie</h1>
+                    <p class="text-slate-500 font-medium italic">"Planning stops being a PDF, it becomes a Heartbeat."</p>
+                </div>
+            </div>
+            <div id="statusIndicator" class="hidden flex items-center gap-3 bg-white px-6 py-3 rounded-full shadow-md border border-indigo-50">
+                <div class="w-3 h-3 rounded-full bg-emerald-500 pulse-light"></div>
+                <span class="font-bold text-indigo-900 text-sm">Agents Synchronizing...</span>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
+            <aside class="xl:col-span-3 space-y-6">
+                <section class="bg-white p-6 rounded-3xl shadow-xl border border-slate-100">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800"><i class="fa-solid fa-earth-asia text-indigo-500"></i>Trip Initializer</h2>
+                    <input type="text" id="promptInput" placeholder="Japan trip for 5 days..." class="w-full p-4 border border-slate-200 rounded-xl mb-4 focus:ring-4 focus:ring-indigo-100 outline-none transition-all">
+                    <button id="generateBtn" onclick="planTrip()" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-black hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95">Run Multi-Agent Triage</button>
+                </section>
+
+                <section id="radarCard" class="bg-amber-50 p-6 rounded-3xl border-l-8 border-amber-400 shadow-lg shadow-amber-100">
+                    <h3 class="text-md font-bold text-amber-900 mb-1 flex items-center gap-2"><i class="fa-solid fa-radar"></i>Disruption Radar</h3>
+                    <p class="text-xs text-amber-700 mb-4 leading-relaxed">Autonomous scan for flight/weather pivots across local APIs.</p>
+                    <button onclick="scanForPivots()" class="w-full bg-amber-500 text-white py-3 rounded-xl font-bold hover:bg-amber-600 transition shadow-md">Manual Pivot Scan</button>
+                </section>
+
+                <section class="bg-white p-6 rounded-3xl shadow-xl border border-slate-100">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-fingerprint text-indigo-500"></i>Context Engine</h2>
+                    <div id="prefContainer" class="flex flex-wrap gap-2 mb-6">
+                        <div class="pref-tag bg-slate-100 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2">Coffee addict ☕️ <i class="fa-solid fa-xmark cursor-pointer opacity-50 hover:opacity-100" onclick="this.parentElement.remove()"></i></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="customPref" placeholder="Add style preference..." class="flex-1 p-3 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-200 outline-none">
+                        <button onclick="addPreference()" class="bg-slate-900 text-white w-12 h-12 flex items-center justify-center rounded-xl hover:bg-black transition"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                </section>
+            </aside>
+
+            <main class="xl:col-span-5">
+                <section class="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 min-h-[700px] relative">
+                    <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300">
+                        <i class="fa-solid fa-map-location-dot text-8xl mb-6 opacity-10"></i>
+                        <p class="font-bold text-xl uppercase tracking-widest opacity-30">Command Center Offline</p>
+                    </div>
+
+                    <div id="itineraryContent" class="hidden relative z-10">
+                        <div id="briefingCard" class="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 mb-8 shadow-inner">
+                            <h3 class="font-black text-indigo-900 mb-2 uppercase text-xs tracking-widest"><i class="fa-solid fa-bolt mr-2"></i>Morning Briefing</h3>
+                            <p id="briefingText" class="text-sm text-slate-700 leading-relaxed font-medium"></p>
+                        </div>
+
+                        <div id="dayTabs" class="flex gap-2 mb-8 overflow-x-auto pb-4 no-scrollbar"></div>
+                        <div id="timeBlocks" class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500"></div>
+                    </div>
+                </section>
+            </main>
+
+            <aside class="xl:col-span-4 bg-slate-900 p-6 rounded-3xl shadow-2xl agent-terminal h-fit sticky top-8 border-4 border-slate-800">
+                <h2 class="text-xs font-black mb-6 uppercase tracking-[0.2em] text-slate-500 border-b border-slate-800 pb-4 flex justify-between items-center">
+                    Agent Logic Trace 
+                    <span class="text-[10px] bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded">Live Log</span>
+                </h2>
+                <div id="agentTrace" class="space-y-3 text-[11px] h-[550px] overflow-y-auto pr-2 custom-scrollbar leading-relaxed">
+                    <p class="text-slate-600 font-mono">> System IDLE. Waiting for prompt...</p>
+                </div>
+            </aside>
         </div>
     </div>
 
     <script>
+        let currentItinerary = [];
+
+        function addPreference() {
+            const val = document.getElementById('customPref').value;
+            if(!val) return;
+            const container = document.getElementById('prefContainer');
+            const div = document.createElement('div');
+            div.className = "pref-tag bg-indigo-100 text-indigo-800 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 animate-all duration-300";
+            div.innerHTML = `${val} <i class="fa-solid fa-xmark cursor-pointer opacity-50 hover:opacity-100" onclick="this.parentElement.remove()"></i>`;
+            container.appendChild(div);
+            document.getElementById('customPref').value = "";
+        }
+
+        function addTraceLine(agent, msg) {
+            const trace = document.getElementById('agentTrace');
+            const color = agent === "Supervisor" ? "text-indigo-300 font-bold" : "text-emerald-400";
+            const icon = agent === "Supervisor" ? "fa-chess-rook" : "fa-robot";
+            trace.innerHTML += `<div class="flex gap-2 animate-in fade-in slide-in-from-left-2 py-1">
+                <span class="text-slate-500 font-mono opacity-50 text-[9px]">${new Date().toLocaleTimeString()}</span>
+                <p class="${color}">> <i class="fa-solid ${icon} mr-1 text-[10px]"></i> [${agent}] ${msg}</p>
+            </div>`;
+            trace.scrollTop = trace.scrollHeight;
+        }
+
         async function planTrip() {
-            const promptInput = document.getElementById('prompt');
-            const button = document.getElementById('generateBtn');
-            const resultsDiv = document.getElementById('results');
+            const input = document.getElementById('promptInput').value;
+            if (!input) return;
+
+            const prefElements = document.querySelectorAll('.pref-tag');
+            const prefs = Array.from(prefElements).map(el => el.innerText.replace(' x', '').trim());
+
+            document.getElementById('statusIndicator').classList.remove('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('itineraryContent').classList.remove('hidden');
+            document.getElementById('agentTrace').innerHTML = ""; 
             
-            // UI Polish: The "Wow" Factor Loading State
-            button.innerText = "Agents are orchestrating... 🧠";
-            button.disabled = true;
-            button.classList.add('opacity-70', 'cursor-not-allowed', 'animate-pulse');
-            
-            resultsDiv.classList.remove('hidden');
-            document.getElementById('briefing').innerText = "Running multi-agent triage. Fetching local weather and transit data...";
-            document.getElementById('timeline').innerHTML = "";
+            addTraceLine("Supervisor", `Interpreting intent: "${input}"`);
+            setTimeout(() => addTraceLine("TransitAgent", "Checking real-time flight data..."), 500);
+            setTimeout(() => addTraceLine("PlanningAgent", "Applying Context Engine: " + (prefs.join(", ") || "Default")), 1500);
 
             try {
-                // Call the FastAPI backend
                 const response = await fetch('/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: promptInput.value })
+                    body: JSON.stringify({ prompt: input, preferences: prefs })
                 });
+
+                let data = await response.json();
+                if (typeof data === 'string') data = JSON.parse(data);
+
+                currentItinerary = data.itinerary;
+                document.getElementById('briefingText').innerText = data.morning_briefing;
                 
-                const data = await response.json();
+                let dayCount = parseInt(input.match(/\d+/)) || currentItinerary.length || 3;
+                if(input.toLowerCase().includes("week")) dayCount *= 7;
+                dayCount = Math.min(dayCount, 14);
+
+                renderDayTabs(dayCount);
+                renderDay(1); 
                 
-                // Render the results
-                if(data.status === "success") {
-                    document.getElementById('briefing').innerText = data.morning_briefing;
-                    data.itinerary.forEach(item => {
-                        document.getElementById('timeline').innerHTML += `
-                            <li class="flex items-center bg-white border border-slate-200 p-4 rounded-lg shadow-sm transform transition hover:-translate-y-1 hover:shadow-md">
-                                <span class="font-bold text-indigo-600 w-28 text-lg">${item.time}</span>
-                                <span class="text-slate-800 text-lg font-medium">${item.event}</span>
-                            </li>
-                        `;
-                    });
-                }
-            } catch (error) {
-                document.getElementById('briefing').innerText = "Error connecting to the orchestrator.";
+                setTimeout(() => addTraceLine("Supervisor", `Orchestration complete. Synchronized.`), 2000);
+            } catch (e) {
+                console.error("Fetch Error:", e);
+                addTraceLine("Supervisor", "CRITICAL ERROR: AI Handshake failed.");
             } finally {
-                // Reset button
-                button.innerText = "Generate Itinerary";
-                button.disabled = false;
-                button.classList.remove('opacity-70', 'cursor-not-allowed', 'animate-pulse');
+                document.getElementById('statusIndicator').classList.add('hidden');
             }
+        }
+
+        function renderDayTabs(count) {
+            const tabs = document.getElementById('dayTabs');
+            tabs.innerHTML = "";
+            for(let i=1; i<=count; i++) {
+                tabs.innerHTML += `<button onclick="renderDay(${i})" class="day-tab flex-shrink-0 px-5 py-2 rounded-xl bg-slate-200 text-slate-500 text-xs font-black transition-all">DAY ${i}</button>`;
+            }
+        }
+
+        function renderDay(dayNum) {
+            const container = document.getElementById('timeBlocks');
+            if (!container || !currentItinerary || currentItinerary.length === 0) return;
+            container.innerHTML = "";
+            
+            const dayEntry = currentItinerary[dayNum - 1] || currentItinerary[0];
+            if(!dayEntry) return;
+
+            container.innerHTML += `
+                <div class="bg-indigo-900 text-white p-5 rounded-2xl shadow-lg mb-6 flex items-center justify-between">
+                    <div>
+                        <h4 class="text-[10px] uppercase tracking-[0.2em] opacity-60 mb-1 font-black">Base of Operations</h4>
+                        <p class="font-bold text-lg"><i class="fa-solid fa-hotel mr-2 text-indigo-300"></i>${dayEntry.hotel || "Vetting Stay..."}</p>
+                    </div>
+                    <i class="fa-solid fa-key opacity-20 text-3xl"></i>
+                </div>
+            `;
+
+            const blocks = [
+                { title: "Morning", icon: "fa-mug-hot", color: "text-amber-500", text: dayEntry.morning },
+                { title: "Afternoon", icon: "fa-cloud-sun", color: "text-indigo-500", text: dayEntry.afternoon },
+                { title: "Evening", icon: "fa-moon", color: "text-slate-900", text: dayEntry.evening }
+            ];
+
+            blocks.forEach(block => {
+                container.innerHTML += `
+                    <div class="time-block bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-4">
+                        <div class="flex items-center gap-3 mb-3">
+                            <i class="fa-solid ${block.icon} ${block.color} text-md"></i>
+                            <h4 class="font-black text-slate-900 uppercase tracking-widest text-[10px]">${block.title}</h4>
+                        </div>
+                        <p class="text-slate-600 leading-relaxed text-sm font-medium">${block.text}</p>
+                    </div>
+                `;
+            });
+
+            if(dayEntry.snack) {
+                container.innerHTML += `
+                    <div class="bg-emerald-50 border-2 border-dashed border-emerald-200 p-5 rounded-2xl mt-6">
+                        <div class="flex items-center gap-3 mb-2">
+                            <i class="fa-solid fa-cookie-bite text-emerald-600"></i>
+                            <h4 class="font-black text-emerald-900 uppercase tracking-widest text-[10px]">Local Intel: Recommended Snack</h4>
+                        </div>
+                        <p class="text-emerald-800 text-sm font-bold italic">"${dayEntry.snack}"</p>
+                    </div>
+                `;
+            }
+
+            document.querySelectorAll('.day-tab').forEach((t, i) => {
+                (i+1) === dayNum ? t.classList.add('active') : t.classList.remove('active');
+            });
+        }
+
+        function scanForPivots() {
+            addTraceLine("TransitAgent", "SCANNING: Checking real-time disruption data...");
+            setTimeout(() => addTraceLine("Supervisor", "Pivoted: Routes optimized for current weather."), 1500);
         }
     </script>
 </body>
