@@ -104,4 +104,4 @@ class TravellerSubAgents:
             "Use tool_maps to verify locations and tool_search to check opening times. "
             "Combine all data into a cohesive, high-detail plan for specific days."
         )
-        return self._run_agent([tool_maps, tool_search], prompt, preferences, messages)
+        return self._run_agent([tool_maps, tool_search], prompt, messages)
