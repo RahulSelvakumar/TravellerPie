@@ -1,33 +1,32 @@
 # 1. Use an official lightweight Python image
 FROM python:3.11-slim
 
-# 2. Set the working directory inside the container
+# 2. Set the working directory to root
 WORKDIR /code
 
-# 3. Prevent Python from writing .pyc files and enable unbuffered logging
-# This ensures you see your "🤖 Graph is thinking..." logs in real-time
+# 3. Standard Python environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
-
-# 4. Set the PYTHONPATH so 'app' and 'agents' can find each other
-# This is the FIX for your ModuleNotFoundError
+# This ensures 'app', 'agents', and 'tools' are all discoverable
 ENV PYTHONPATH=/code
 
-# 5. Install system dependencies if needed (rare for pure Python but safe)
+# 4. Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends gcc && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 6. Copy and install requirements
+# 5. Copy and install requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# 7. Copy the entire project into the container
+# 6. Copy the entire project (including tools/ and agents/)
 COPY . .
 
-# 8. Set the default Port for Cloud Run
-ENV PORT=8000
-EXPOSE 8000
+# 7. Use the PORT environment variable provided by Cloud Run
+ENV PORT=8080
+EXPOSE 8080
 
-# Command to run the FastAPI app
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 8. Optimized Startup Command
+# Using 'python -m uvicorn' ensures the root-level packages are found.
+# Using ${PORT} ensures we listen where Google Cloud is looking.
+CMD ["sh", "-c", "python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]

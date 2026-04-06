@@ -63,9 +63,8 @@ async def generate_itinerary(request: Request):
         print(f"❌ Execution Error: {e}")
         return {"status": "error", "message": str(e)}
 
-# --- UVICORN STARTUP ---
 if __name__ == "__main__":
     import uvicorn
-    # Use PORT from environment (Cloud Run requirement)
-    port = int(os.environ.get("PORT", 8000))
+    # Cloud Run injects "PORT". If it's missing (local), use 8080.
+    port = int(os.environ.get("PORT", 8080)) 
     uvicorn.run(app, host="0.0.0.0", port=port)
