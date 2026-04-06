@@ -31,38 +31,34 @@ async def home_page(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 # --- MERGED GENERATE ROUTE ---
+import json
+from fastapi.responses import JSONResponse
+
 @app.post("/generate")
 async def generate_itinerary(request: Request):
     try:
-        # 1. Parse the JSON from the UI
         data = await request.json()
-        
-        # 2. Extract the string and the list with safe defaults
-        user_prompt = str(data.get("prompt", "Plan a trip"))
-        user_prefs = data.get("preferences", []) 
-        
-        print(f"🚀 Launching Agents for: {user_prompt}")
-        print(f"Context Engine Tags: {user_prefs}")
+        user_prompt = data.get("prompt", "Plan a trip")
+        user_prefs = data.get("preferences", [])
 
-        # 3. Construct the state for LangGraph
-        # 'messages' must be a list of BaseMessages
         initial_state = {
             "messages": [HumanMessage(content=user_prompt)],
             "preferences": user_prefs
         }
         
-        # 4. Invoke the Orchestrator
-        # The result returned here is the JSON string from run_travel_agents
-        result = run_travel_agents(initial_state)
+        # This returns a STRING (e.g., '{"morning_briefing": "..."}')
+        result_string = run_travel_agents(initial_state)
         
-        # FastAPI will automatically set content-type to application/json 
-        # if 'result' is a dict or a valid JSON string
-        return result
+        # CRITICAL FIX: Convert the string back to a Python Dict 
+        # so FastAPI can send it as valid JSON
+        result_dict = json.loads(result_string)
+        return JSONResponse(content=result_dict)
         
     except Exception as e:
-        print(f"❌ Execution Error: {e}")
-        return {"status": "error", "message": str(e)}
-
+        # This will now print the EXACT error in your Cloud Run logs
+        print(f"❌ CRITICAL ERROR IN ROUTE: {str(e)}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    
 if __name__ == "__main__":
     import uvicorn
     # Cloud Run injects "PORT". If it's missing (local), use 8080.

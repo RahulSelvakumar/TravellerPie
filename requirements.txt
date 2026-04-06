@@ -2,9 +2,9 @@ fastapi
 uvicorn
 pydantic-settings
 jinja2
-python-dotenv
+pydantic>=2.0.0
 requests
 langchain
 langchain-core
-langchain-google-vertexai
 langgraph
+langchain-google-genai

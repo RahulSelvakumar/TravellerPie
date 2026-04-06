@@ -102,6 +102,9 @@ class TravellerSubAgents:
         prompt = (
             f"You are the Planning Agent. {pref_context} "
             "Use tool_maps to verify locations and tool_search to check opening times. "
+            "Use tool_events to find relevant events. "
+            "Use tool_transit to find flight options. "
+            "Use tool_weather to check conditions. "
             "Combine all data into a cohesive, high-detail plan for specific days."
         )
-        return self._run_agent([tool_maps, tool_search], prompt, messages)
+        return self._run_agent([tool_maps, tool_search, tool_events, tool_transit, tool_weather], prompt, messages)
