@@ -2,6 +2,7 @@
 import os
 import json
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_vertexai import ChatVertexAI
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage, AIMessage, ToolMessage, HumanMessage
 from langchain_core.tools import tool
@@ -45,12 +46,13 @@ def tool_maps(place_name: str) -> str:
 # --- THE SUB-AGENT CLASS ---
 class TravellerSubAgents:
     def __init__(self):
-        # Use Flash for speed and higher rate limits
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+        # Switch to Vertex AI to use your $1,000 credits
+        self.llm = ChatVertexAI(
+            model_name="gemini-2.5-flash",
+            project="travellerpie-hackathon",
+            location="us-central1",
             temperature=0
         )
-
     def _run_agent(self, tools, system_prompt, messages):
         """A robust, manual tool-calling loop for the agents."""
         llm_with_tools = self.llm.bind_tools(tools)

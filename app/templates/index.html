@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TravellerPie 🥧 | Command Dashboard</title>
+    <link rel="icon" type="image/png" href="/static/logo.png?v=1">
+    <title>TravellerPie | Command Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <style>
@@ -20,19 +21,19 @@
 
     <div class="max-w-screen-2xl mx-auto">
         <header class="flex flex-col md:flex-row items-center justify-between pb-8 border-b-2 border-slate-100 mb-8 gap-4 text-center md:text-left">
-            <div class="flex items-center gap-4">
-                <div class="p-3 bg-indigo-600 text-white rounded-2xl text-3xl shadow-lg">🥧</div>
+            <div class="flex items-center gap-5">
+                <img src="/static/logo.png" alt="TravellerPie Logo" class="w-20 h-20 rounded-2xl shadow-lg border-2 border-white">
                 <div>
                     <h1 class="text-4xl font-black tracking-tight text-slate-900">TravellerPie</h1>
                     <p class="text-slate-500 font-medium italic">"Planning stops being a PDF, it becomes a Heartbeat."</p>
                 </div>
             </div>
+            
             <div id="statusIndicator" class="hidden flex items-center gap-3 bg-white px-6 py-3 rounded-full shadow-md border border-indigo-50">
                 <div class="w-3 h-3 rounded-full bg-emerald-500 pulse-light"></div>
                 <span class="font-bold text-indigo-900 text-sm">Agents Synchronizing...</span>
             </div>
         </header>
-
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
             <aside class="xl:col-span-3 space-y-6">
                 <section class="bg-white p-6 rounded-3xl shadow-xl border border-slate-100">

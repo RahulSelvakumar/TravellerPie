@@ -8,3 +8,4 @@ langchain
 langchain-core
 langgraph
 langchain-google-genai
+langchain-google-vertexai

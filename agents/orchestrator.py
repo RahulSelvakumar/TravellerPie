@@ -4,6 +4,7 @@ import json, operator, re
 from typing import Annotated, List, TypedDict, Union
 import os, time
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_vertexai import ChatVertexAI
 from dotenv import load_dotenv
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, END
@@ -19,7 +20,13 @@ class AgentState(TypedDict):
 # 2. Define the Nodes
 from agents.sub_agents import TravellerSubAgents
 sub_agents = TravellerSubAgents()
-supervisor_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0,google_api_key=os.getenv("GOOGLE_API_KEY"))
+supervisor_llm = ChatVertexAI(
+    model_name="gemini-2.5-flash", # Vertex uses 1.5-flash for maximum quota
+    project="travellerpie-hackathon",
+    location="us-central1",
+    temperature=0,
+    max_retries=6 # This automatically handles small 429 "hiccups"
+)
 
 def call_transit(state: AgentState):
     time.sleep(1)
@@ -46,7 +53,7 @@ def supervisor_node(state: AgentState):
         "You are the TravellerPie Executive Lead. "
         "DECISION RULE: \n"
         "1. If you need more data, output ONLY the word 'TRANSIT', 'INTEL', or 'PLANNING'.\n"
-        "2. If you have enough info, output a LUXURY ITINERARY in STRICT RAW JSON format ONLY.\n"
+        "2. If you have enough info, output a Budget ITINERARY in STRICT RAW JSON format ONLY.\n"
         "JSON KEYS: 'morning_briefing', 'itinerary' (list of objects with: day, hotel, morning, afternoon, evening, snack).\n"
         "CRITICAL: Do NOT include any conversational text, 'Excellent', or markdown code blocks."
     )

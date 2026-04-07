@@ -5,12 +5,20 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
+from fastapi.staticfiles import StaticFiles
+
 
 # Ensure the root directory is in the path for internal imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agents.orchestrator import run_travel_agents
 
 app = FastAPI()
+# 1. DEFINE base_dir FIRST
+base_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 2. NOW you can use it for templates and static files
+templates = Jinja2Templates(directory=os.path.join(base_dir, "templates"))
+app.mount("/static", StaticFiles(directory=os.path.join(base_dir, "static")), name="static")
 
 # Cloud Run health check requires a reliable path to templates
 # Using absolute pathing ensures Jinja2 finds the folder regardless of WORKDIR
@@ -39,29 +47,34 @@ import json
 from fastapi.responses import JSONResponse
 
 @app.post("/generate")
-async def generate_itinerary(request: Request):
+async def generate(request: Request):
     try:
+        # 1. Parse the incoming JSON request
         data = await request.json()
-        user_prompt = data.get("prompt", "Plan a trip")
+        user_prompt = data.get("prompt", "Plan a luxury trip")
         user_prefs = data.get("preferences", [])
 
+        # 2. DEFINE initial_state (This is what was missing!)
         initial_state = {
             "messages": [HumanMessage(content=user_prompt)],
             "preferences": user_prefs
         }
         
-        # This returns a STRING (e.g., '{"morning_briefing": "..."}')
+        # 3. Now call the graph
         result_string = run_travel_agents(initial_state)
         
-        # CRITICAL FIX: Convert the string back to a Python Dict 
-        # so FastAPI can send it as valid JSON
-        result_dict = json.loads(result_string)
-        return JSONResponse(content=result_dict)
+        # 4. Convert and return
+        if isinstance(result_string, str):
+            result_data = json.loads(result_string)
+        else:
+            result_data = result_string
+
+        return JSONResponse(content=result_data)
         
     except Exception as e:
-        # This will now print the EXACT error in your Cloud Run logs
-        print(f"❌ CRITICAL ERROR IN ROUTE: {str(e)}")
+        print(f"❌ Route Error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
     
 if __name__ == "__main__":
     import uvicorn
