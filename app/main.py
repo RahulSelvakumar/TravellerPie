@@ -75,7 +75,25 @@ async def generate(request: Request):
         print(f"❌ Route Error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+@app.post("/cron/radar-scan")
+async def scheduled_radar_scan():
+    """
+    Endpoint triggered by Cloud Scheduler to run the Disruption Radar logic.
+    """
+    print("⏰ Cloud Scheduler: Starting Autonomous Disruption Scan...")
     
+    # 1. Define a system state for the scan
+    scan_state = {
+        "messages": [HumanMessage(content="Scan for travel disruptions in Japan for the next 24 hours.")],
+        "preferences": ["Safety first", "Real-time updates"]
+    }
+    
+    # 2. Trigger the orchestrator (or a specific sub-agent)
+    result = run_travel_agents(scan_state)
+    
+    # In a real app, you'd send an email/notification here with the 'result'
+    return {"status": "success", "agent_report": "Scan completed"}
+
 if __name__ == "__main__":
     import uvicorn
     # Cloud Run injects "PORT". If it's missing (local), use 8080.
