@@ -28,8 +28,12 @@ async def health_check():
 
 @app.get("/", response_class=HTMLResponse)
 async def home_page(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
+    # This explicit keyword format prevents the 'unhashable type' error
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={"request": request}
+    )
 # --- MERGED GENERATE ROUTE ---
 import json
 from fastapi.responses import JSONResponse
