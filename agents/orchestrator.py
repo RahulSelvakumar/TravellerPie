@@ -1,72 +1,72 @@
 import json, operator, re, os, asyncio
 from typing import Annotated, List, TypedDict, Sequence
-from langchain_google_vertexai import ChatVertexAI
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
-from langgraph.graph import StateGraph, END
-import json, re, operator
+from dotenv import load_dotenv
 
-# 1. State Definition
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langgraph.graph import StateGraph, END
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+# 1. Load API Key from .env
+load_dotenv()
+
+# 2. DEFINE STATE FIRST (Fixes NameError)
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     preferences: List[str]
-    next: str
 
-# 2. Model Initialization
-llm = ChatVertexAI(
-    model_name="gemini-2.5-flash", 
-    project="travellerpie-hackathon", 
-    location="us-central1"
+# 3. INITIALIZE MODEL
+llm_base = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    google_api_key=os.getenv("GOOGLE_API_KEY"),
+    temperature=0
 )
+llm = llm_base.bind_tools([{"google_search": {}}])
 
-# 3. Supervisor Node - Flexible for any number of days
+# 4. DEFINE NODES
 async def supervisor_node(state: AgentState):
-    # EXTRACTION: Manually find the number of days in the prompt
     user_text = state['messages'][-1].content
-    day_match = re.search(r'(\d+)\s*day', user_text, re.IGNORECASE)
-    num_days = day_match.group(1) if day_match else "5" # Default to 5 if not found
-
-    system_prompt = f"""You are the TravellerPie Lead. You MUST return ONLY a JSON object. 
-    The user is traveling for EXACTLY {num_days} days. Generate a JSON object with {num_days} entries in the 'days' array.
     
-    CRITICAL: Do not ask questions. Do not use markdown backticks. 
-    Return ONLY the raw JSON string matching this schema:
-    {{
-      "morning_briefing": "...",
-      "logistics": {{ "flight_path": "...", "airline": "...", "departure": "...", "arrival": "..." }},
-      "days": [ {{ "day_number": 1, "hotel": "...", "morning": "...", "afternoon": "...", "evening": "...", "snack": "..." }} ],
-      "sources": []
-    }}"""
+    # Extract Origin to avoid 'Los Angeles' default
+    origin_match = re.search(r'from\s+([a-zA-Z\s]+)', user_text, re.IGNORECASE)
+    origin = origin_match.group(1).strip() if origin_match else "Bangalore"
+    
+    day_match = re.search(r'(\d+)\s*(?:day|days)?', user_text, re.IGNORECASE)
+    num_days = day_match.group(1) if day_match else "3"
+
+    system_prompt = f"""You are the TravellerPie Lead.
+1. Use `Google Search` for 3 REAL flight options from {origin} to the destination for May 2026.
+2. Structure JSON with airline, route, price, and link.
+3. Plan {num_days} days of activities.
+
+Return ONLY raw JSON:
+{{
+  "morning_briefing": "...",
+  "logistics": [ {{ "airline": "..", "route": "..", "price": "..", "link": ".." }} ],
+  "days": [ {{ "day_number": 1, "hotel": "..", "morning": "..", "afternoon": "..", "evening": ".." }} ],
+  "sources": []
+}}"""
 
     response = await llm.ainvoke([SystemMessage(content=system_prompt)] + state['messages'])
-    return {"next": END, "messages": [response]}
+    return {"messages": [response]}
 
-# 4. Graph Assembly
+# 5. COMPILE GRAPH
 workflow = StateGraph(AgentState)
 workflow.add_node("Supervisor", supervisor_node)
 workflow.set_entry_point("Supervisor")
-app = workflow.compile() # Compiled as 'app'
+workflow.add_edge("Supervisor", END)
+app = workflow.compile()
 
-# 5. Main Execution Function
 async def run_travel_agents(initial_state: dict):
-    # Ensure initial_state contains 'prompt'
-    prompt_text = initial_state.get("prompt", "Japan trip")
-    prefs = initial_state.get("preferences", [])
-    
+    user_prompt = initial_state.get("prompt", "Trip from Bangalore")
     inputs = {
-        "messages": [HumanMessage(content=prompt_text)],
-        "preferences": prefs
+        "messages": [HumanMessage(content=user_prompt)],
+        "preferences": initial_state.get("preferences", [])
     }
-    
     try:
-        final_state = await app.ainvoke(inputs, {"recursion_limit": 50})
+        final_state = await app.ainvoke(inputs)
         content = final_state["messages"][-1].content
-        
-        # Regex to strip markdown and extract JSON
         match = re.search(r'(\{.*\})', content, re.DOTALL)
-        json_string = match.group(1) if match else content
-        
-        print(f"\n🚀 [DEBUG] SUCCESSFUL ORCHESTRATION:\n{json_string[:200]}...")
-        return json_string
+        return match.group(1).strip() if match else content
     except Exception as e:
-        print(f"❌ [DEBUG] ERROR: {str(e)}")
-        return json.dumps({"error": str(e), "morning_briefing": "System handshake error."})
+        print(f"❌ ORCHESTRATOR ERROR: {e}")
+        return json.dumps({"morning_briefing": "Sync error."})
