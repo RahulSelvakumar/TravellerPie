@@ -1,126 +1,72 @@
-# agents/orchestrator.py
-from collections.abc import Sequence
-import json, operator, re
-from typing import Annotated, List, TypedDict, Union
-import os, time
-from langchain_google_genai import ChatGoogleGenerativeAI
+import json, operator, re, os, asyncio
+from typing import Annotated, List, TypedDict, Sequence
 from langchain_google_vertexai import ChatVertexAI
-from dotenv import load_dotenv
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
 from langgraph.graph import StateGraph, END
+import json, re, operator
 
-load_dotenv()
-
-# 1. Define the State
+# 1. State Definition
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     preferences: List[str]
-    next: str 
+    next: str
 
-# 2. Define the Nodes
-from agents.sub_agents import TravellerSubAgents
-sub_agents = TravellerSubAgents()
-supervisor_llm = ChatVertexAI(
-    model_name="gemini-2.5-flash", # Vertex uses 1.5-flash for maximum quota
-    project="travellerpie-hackathon",
-    location="us-central1",
-    temperature=0,
-    max_retries=6 # This automatically handles small 429 "hiccups"
+# 2. Model Initialization
+llm = ChatVertexAI(
+    model_name="gemini-2.5-flash", 
+    project="travellerpie-hackathon", 
+    location="us-central1"
 )
 
-def call_transit(state: AgentState):
-    time.sleep(1)
-    response = sub_agents.transit_agent(state['messages'])
-    return {"messages": [HumanMessage(content=response.content, name="TransitAgent")]}
+# 3. Supervisor Node - Flexible for any number of days
+async def supervisor_node(state: AgentState):
+    # EXTRACTION: Manually find the number of days in the prompt
+    user_text = state['messages'][-1].content
+    day_match = re.search(r'(\d+)\s*day', user_text, re.IGNORECASE)
+    num_days = day_match.group(1) if day_match else "5" # Default to 5 if not found
 
-def call_intel(state: AgentState):
-    time.sleep(1)
-    response = sub_agents.intel_agent(state['messages'])
-    return {"messages": [HumanMessage(content=response.content, name="LocalIntelAgent")]}
+    system_prompt = f"""You are the TravellerPie Lead. You MUST return ONLY a JSON object. 
+    The user is traveling for EXACTLY {num_days} days. Generate a JSON object with {num_days} entries in the 'days' array.
+    
+    CRITICAL: Do not ask questions. Do not use markdown backticks. 
+    Return ONLY the raw JSON string matching this schema:
+    {{
+      "morning_briefing": "...",
+      "logistics": {{ "flight_path": "...", "airline": "...", "departure": "...", "arrival": "..." }},
+      "days": [ {{ "day_number": 1, "hotel": "...", "morning": "...", "afternoon": "...", "evening": "...", "snack": "..." }} ],
+      "sources": []
+    }}"""
 
-def call_planning(state: AgentState):
-    time.sleep(1)
-    response = sub_agents.planning_agent(state['messages'])
-    return {"messages": [HumanMessage(content=response.content, name="PlanningAgent")]}
+    response = await llm.ainvoke([SystemMessage(content=system_prompt)] + state['messages'])
+    return {"next": END, "messages": [response]}
 
-def supervisor_node(state: AgentState):
-    user_prefs = state.get('preferences', [])
-    prefs_str = ", ".join(user_prefs) if user_prefs else "None"
-    
-    # AGGRESSIVE PROMPT: Demands JSON and forbids conversation
-    system_prompt = (
-        f"User Context: {prefs_str}. "
-        "You are the TravellerPie Executive Lead. "
-        "DECISION RULE: \n"
-        "1. If you need more data, output ONLY the word 'TRANSIT', 'INTEL', or 'PLANNING'.\n"
-        "2. If you have enough info, output a Budget ITINERARY in STRICT RAW JSON format ONLY.\n"
-        "JSON KEYS: 'morning_briefing', 'itinerary' (list of objects with: day, hotel, morning, afternoon, evening, snack).\n"
-        "CRITICAL: Do NOT include any conversational text, 'Excellent', or markdown code blocks."
-    )
-    
-    messages = [SystemMessage(content=system_prompt)] + state['messages']
-    response = supervisor_llm.invoke(messages)
-    content = response.content.strip()
-    
-    # Routing Logic
-    if "{" in content:
-        return {"next": END, "messages": [response]}
-    
-    upper_content = content.upper()
-    if "TRANSIT" in upper_content:
-        return {"next": "TransitAgent", "messages": [response]}
-    if "INTEL" in upper_content or "LOCAL" in upper_content:
-        return {"next": "LocalIntelAgent", "messages": [response]}
-    
-    # Default to Planning if it's being vague
-    return {"next": "PlanningAgent", "messages": [response]}
-
-# 3. Build the Graph
+# 4. Graph Assembly
 workflow = StateGraph(AgentState)
 workflow.add_node("Supervisor", supervisor_node)
-workflow.add_node("TransitAgent", call_transit)
-workflow.add_node("LocalIntelAgent", call_intel)
-workflow.add_node("PlanningAgent", call_planning)
-
-workflow.add_edge("TransitAgent", "Supervisor")
-workflow.add_edge("LocalIntelAgent", "Supervisor")
-workflow.add_edge("PlanningAgent", "Supervisor")
-
-workflow.add_conditional_edges(
-    "Supervisor",
-    lambda x: x["next"],
-    {
-        "TransitAgent": "TransitAgent",
-        "LocalIntelAgent": "LocalIntelAgent",
-        "PlanningAgent": "PlanningAgent",
-        END: END
-    }
-)
-
 workflow.set_entry_point("Supervisor")
-app = workflow.compile() 
+app = workflow.compile() # Compiled as 'app'
 
-def run_travel_agents(initial_state: dict):
+# 5. Main Execution Function
+async def run_travel_agents(initial_state: dict):
+    # Ensure initial_state contains 'prompt'
+    prompt_text = initial_state.get("prompt", "Japan trip")
+    prefs = initial_state.get("preferences", [])
+    
+    inputs = {
+        "messages": [HumanMessage(content=prompt_text)],
+        "preferences": prefs
+    }
+    
     try:
-        print("🤖 Graph is thinking...")
-        final_state = app.invoke(initial_state)
-        raw_content = final_state["messages"][-1].content
+        final_state = await app.ainvoke(inputs, {"recursion_limit": 50})
+        content = final_state["messages"][-1].content
         
-        # FINAL SANITIZATION: Regex finds the first { and last } to ignore "Excellent" chatter
-        json_match = re.search(r'(\{.*\})', raw_content, re.DOTALL)
+        # Regex to strip markdown and extract JSON
+        match = re.search(r'(\{.*\})', content, re.DOTALL)
+        json_string = match.group(1) if match else content
         
-        if json_match:
-            clean_json = json_match.group(1)
-            print(f"✅ CLEANED JSON EXTRACTED")
-            return clean_json
-        else:
-            # If the AI just returned text, wrap it so the UI displays the briefing at least
-            print("⚠️ No JSON found, returning text as briefing.")
-            return json.dumps({
-                "morning_briefing": raw_content,
-                "itinerary": []
-            })
-            
+        print(f"\n🚀 [DEBUG] SUCCESSFUL ORCHESTRATION:\n{json_string[:200]}...")
+        return json_string
     except Exception as e:
-        print(f"❌ GRAPH ERROR: {e}")
-        return json.dumps({"status": "error", "message": str(e)})
+        print(f"❌ [DEBUG] ERROR: {str(e)}")
+        return json.dumps({"error": str(e), "morning_briefing": "System handshake error."})
