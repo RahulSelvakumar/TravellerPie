@@ -18,6 +18,7 @@ class AgentState(TypedDict):
 llm_base = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     google_api_key=os.getenv("GOOGLE_API_KEY"),
+    location="us-east1",
     temperature=0
 )
 llm = llm_base.bind_tools([{"google_search": {}}])
