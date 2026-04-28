@@ -29,4 +29,5 @@ EXPOSE 8080
 # 8. Optimized Startup Command
 # Using 'python -m uvicorn' ensures the root-level packages are found.
 # Using ${PORT} ensures we listen where Google Cloud is looking.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+# Use 'exec' to ensure signals (like SIGTERM) are handled correctly by uvicorn
+CMD exec uvicorn app.main:app --host 0.0.0.0 --port $PORT
