@@ -6,38 +6,48 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-# 1. Load API Key from .env
+# 1. Load API Key
 load_dotenv()
 
-# 2. DEFINE STATE FIRST (Fixes NameError)
+# 2. DEFINE STATE
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     preferences: List[str]
+    # Adding specific fields to state for dynamic access across nodes
+    origin: str
+    destination: str
+    num_days: int
 
 # 3. INITIALIZE MODEL
-llm_base = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash", # Use 1.5 Flash for stable hackathon performance
     google_api_key=os.getenv("GOOGLE_API_KEY"),
-    location="us-east1",
     temperature=0
 )
-llm = llm_base.bind_tools([{"google_search": {}}])
 
 # 4. DEFINE NODES
 async def supervisor_node(state: AgentState):
-    user_text = state['messages'][-1].content
+    # Extract variables from state to prevent NameError
+    origin = state.get("origin", "Bangalore")
+    destination = state.get("destination", "Japan")
+    num_days = state.get("num_days", 4)
+    interests = state.get("preferences", [])
     
-    # Extract Origin to avoid 'Los Angeles' default
-    origin_match = re.search(r'from\s+([a-zA-Z\s]+)', user_text, re.IGNORECASE)
-    origin = origin_match.group(1).strip() if origin_match else "Bangalore"
-    
-    day_match = re.search(r'(\d+)\s*(?:day|days)?', user_text, re.IGNORECASE)
-    num_days = day_match.group(1) if day_match else "3"
+    # Create a strict constraint string
+    constraint_block = "GENERAL TOURISM"
+    if interests:
+        constraint_block = f"MANDATORY: You MUST include specific activities for: {', '.join(interests)}."
 
-    system_prompt = f"""You are the TravellerPie Lead.
-1. Use `Google Search` for 3 REAL flight options from {origin} to the destination for May 2026.
-2. Structure JSON with airline, route, price, and link.
-3. Plan {num_days} days of activities.
+    system_prompt = f"""You are the TravellerPie Lead. {constraint_block}
+    RULES:
+    - If 'gym' is a constraint, find a specific high-end gym or hotel with a 24/7 fitness center in the destination.
+    - If 'minimalist' is a constraint, avoid cluttered markets; choose modern architecture.
+    - Plan a {state.get('num_days')} day trip from {origin}.
+    
+1. Plan a trip from {origin} to {destination}.
+2. Use your knowledge to provide 3 REALISTIC flight options for May 2026.
+3. Structure JSON with airline, route, price, and link.
+4. Plan {num_days} days of activities.
 
 Return ONLY raw JSON:
 {{
@@ -55,19 +65,37 @@ workflow = StateGraph(AgentState)
 workflow.add_node("Supervisor", supervisor_node)
 workflow.set_entry_point("Supervisor")
 workflow.add_edge("Supervisor", END)
-app = workflow.compile()
+graph_app = workflow.compile()
 
+# 6. DYNAMIC ORCHESTRATOR
 async def run_travel_agents(initial_state: dict):
-    user_prompt = initial_state.get("prompt", "Trip from Bangalore")
+    user_prompt = initial_state.get("prompt", "")
+    
+    # --- DYNAMIC EXTRACTION LAYER ---
+    # Using regex to find common patterns for origin, destination, and days
+    # Example: "from Bangalore to Japan for 5 days"
+    origin_match = re.search(r'from\s+([a-zA-Z\s]+?)(?=\s+to|\s+for|$)', user_prompt, re.I)
+    dest_match = re.search(r'to\s+([a-zA-Z\s]+?)(?=\s+for|\s+from|$)', user_prompt, re.I)
+    days_match = re.search(r'(\d+)\s+day', user_prompt, re.I)
+
+    origin = origin_match.group(1).strip() if origin_match else "Bangalore"
+    destination = dest_match.group(1).strip() if dest_match else "Japan"
+    num_days = int(days_match.group(1)) if days_match else 4
+
     inputs = {
         "messages": [HumanMessage(content=user_prompt)],
-        "preferences": initial_state.get("preferences", [])
+        "preferences": initial_state.get("preferences", []),
+        "origin": origin,
+        "destination": destination,
+        "num_days": num_days
     }
+    
     try:
-        final_state = await app.ainvoke(inputs)
+        final_state = await graph_app.ainvoke(inputs)
         content = final_state["messages"][-1].content
+        # Scrubber to ensure clean JSON is returned to the UI
         match = re.search(r'(\{.*\})', content, re.DOTALL)
         return match.group(1).strip() if match else content
     except Exception as e:
         print(f"❌ ORCHESTRATOR ERROR: {e}")
-        return json.dumps({"morning_briefing": "Sync error."})
+        return json.dumps({"morning_briefing": f"Sync error: {str(e)}"})
