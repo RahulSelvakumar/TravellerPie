@@ -5,12 +5,13 @@ from sqlalchemy import create_engine, Column, Integer, String, JSON, ForeignKey,
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
-# Load environment variables from .env
+# Load environment variables from .env when present
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
-    raise ValueError("❌ DATABASE_URL not found in .env file!")
+    DATABASE_URL = f"sqlite:///{os.path.join(os.getcwd(), 'travellerpie.db')}"
+    print("WARNING: DATABASE_URL not set; falling back to local SQLite database.")
 
 # MySQL Engine Configuration
 engine = create_engine(
