@@ -1,12 +1,6 @@
 import sys
 import os
 
-# 1. IMMEDIATE PATH INJECTION
-# This must be the first thing the script does to find 'app.database'
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(BASE_DIR, ".."))
-
-
 # 2. CLEAN IMPORTS
 import json
 import uvicorn
@@ -30,9 +24,22 @@ ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Static mounting relative to the app package
+import os
+from fastapi.staticfiles import StaticFiles
+
+# 1. Get the absolute path to the 'app' directory
+# Since main.py is in /code/app, this will be /code/app
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 2. Point to the static folder inside 'app'
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-if not os.path.exists(STATIC_DIR): os.makedirs(STATIC_DIR)
+
+# 3. DEBUG PRINT: This will show up in your Cloud Run logs
+print(f"DEBUG: Looking for static files in: {STATIC_DIR}")
+print(f"DEBUG: logo.png exists: {os.path.exists(os.path.join(STATIC_DIR, 'logo.png'))}")
+
+# 4. Mount WITHOUT makedirs
+# If this fails, Cloud Run will show a specific error in logs
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 def get_db():
