@@ -147,4 +147,3 @@ zstandard==0.25.0
 sqlalchemy
 pymysql
 python-jose[cryptography]
-passlib[bcrypt]

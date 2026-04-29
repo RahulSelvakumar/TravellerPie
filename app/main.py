@@ -41,7 +41,19 @@ def ensure_db_initialized():
 # --- CONFIGURATION ---
 SECRET_KEY = os.getenv("JWT_SECRET", "rahul_2026_security_key")
 ALGORITHM = "HS256"
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# app/main.py
+import hashlib
+
+# 1. DELETE the pwd_context and CryptContext lines
+# 2. ADD these simple, stable functions
+def get_password_hash(password: str):
+    """Pure Python SHA256 hashing - no external binary dependencies."""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(plain_password: str, hashed_password: str):
+    """Verifies the login attempt matches the stored hash."""
+    return get_password_hash(plain_password) == hashed_password
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # 1. Get the absolute path to the 'app' directory
@@ -87,14 +99,18 @@ async def read_index():
 async def register(request: Request, db: Session = Depends(get_db)):
     try:
         data = await request.json()
-        # Explicitly pull interests from the JSON body
+        password = data['password']
+        
+        # FIX: Truncate password to 72 characters to satisfy bcrypt
+        safe_password = password[:72] if len(password) > 72 else password
+        
         new_user = User(
-            username=data['username'],
-            hashed_password=pwd_context.hash(data['password']),
-            interests=data.get('interests', []) # Matches the key from your JS
-        )
+    username=data['username'],
+    hashed_password=get_password_hash(data['password']), 
+    interests=data.get('interests', [])
+)
         db.add(new_user)
-        db.commit() # This performs the physical write to Cloud SQL
+        db.commit()
         return {"status": "success"}
     except Exception as e:
         print(f"❌ Registration error: {str(e)}")
@@ -104,15 +120,18 @@ async def register(request: Request, db: Session = Depends(get_db)):
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     try:
         user = db.query(User).filter(User.username == form_data.username).first()
-        if not user or not pwd_context.verify(form_data.password, user.hashed_password):
+        
+        # FIX: Truncate login password to 72 chars to match the registration hash
+        safe_password = form_data.password[:72] if len(form_data.password) > 72 else form_data.password
+        
+        if not user or not verify_password(form_data.password, user.hashed_password):
             raise HTTPException(status_code=400, detail="Invalid credentials")
+            
         token = jwt.encode({"sub": user.username}, SECRET_KEY, algorithm=ALGORITHM)
         return {"access_token": token, "token_type": "bearer"}
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"❌ Login error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+        print(f"❌ Login Handshake Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Identity verification failed")
 
 @app.get("/itineraries")
 async def get_plans(request: Request, db: Session = Depends(get_db)):

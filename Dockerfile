@@ -22,10 +22,12 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # 6. Copy the entire project (including tools/ and agents/)
 COPY . .
 
-# 7. Use the PORT environment variable provided by Cloud Run
+# 7. Make entrypoint executable
+RUN chmod +x /code/entrypoint.sh
+
+# 8. Use the PORT environment variable provided by Cloud Run
 ENV PORT=8080
 EXPOSE 8080
 
-# 8. Startup Command
-# Use direct port to test
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# 9. Run with entrypoint for detailed debugging
+ENTRYPOINT ["/code/entrypoint.sh"]

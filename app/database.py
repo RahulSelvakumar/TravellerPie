@@ -18,9 +18,11 @@ if not DATABASE_URL:
 # For Cloud SQL public IP connections, disable SSL verification
 connect_args = {}
 pool_class = QueuePool
-pool_size = 5
-max_overflow = 10
-pool_recycle = 1800
+pool_kwargs = {
+    "pool_size": 5,
+    "max_overflow": 10,
+    "pool_recycle": 1800,
+}
 
 # Auto-detect Cloud Run environment
 is_cloud_run = os.getenv("K_SERVICE") is not None or os.getenv("ENVIRONMENT") == "cloud"
@@ -37,19 +39,16 @@ if "pymysql" in DATABASE_URL:
     # Use NullPool for serverless/container environments to avoid stale connections
     if is_cloud_run:
         pool_class = NullPool
-        pool_size = 1
-        max_overflow = 0
+        pool_kwargs = {}  # NullPool doesn't accept pool_size or max_overflow
         print("ℹ️  Running in Cloud Run - using NullPool for database connections")
 
 engine = create_engine(
     DATABASE_URL, 
     connect_args=connect_args,
     poolclass=pool_class,
-    pool_size=pool_size,
-    max_overflow=max_overflow,
-    pool_recycle=pool_recycle,
     pool_pre_ping=True,
-    echo=False
+    echo=False,
+    **pool_kwargs
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
