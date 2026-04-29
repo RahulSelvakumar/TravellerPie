@@ -40,7 +40,7 @@ google-resumable-media==2.8.2
 googleapis-common-protos==1.74.0
 griffelib==2.0.2
 grpc-google-iam-v1==0.14.4
-grpcio==1.80.0
+grpcio==1.62.3
 grpcio-status==1.62.3
 h11==0.16.0
 httpcore==1.0.9
@@ -144,3 +144,7 @@ wrapt==2.1.2
 xxhash==3.6.0
 zipp==3.23.1
 zstandard==0.25.0
+sqlalchemy
+pymysql
+python-jose[cryptography]
+passlib[bcrypt]

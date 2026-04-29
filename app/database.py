@@ -1,9 +1,10 @@
 import os
 import datetime
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, JSON, ForeignKey, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, JSON, ForeignKey, DateTime, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.pool import NullPool, QueuePool
 
 # Load environment variables from .env when present
 load_dotenv()
@@ -14,11 +15,43 @@ if not DATABASE_URL:
     print("WARNING: DATABASE_URL not set; falling back to local SQLite database.")
 
 # MySQL Engine Configuration
+# For Cloud SQL public IP connections, disable SSL verification
+connect_args = {}
+pool_class = QueuePool
+pool_size = 5
+max_overflow = 10
+pool_recycle = 1800
+
+# Auto-detect Cloud Run environment
+is_cloud_run = os.getenv("K_SERVICE") is not None or os.getenv("ENVIRONMENT") == "cloud"
+
+if "pymysql" in DATABASE_URL:
+    connect_args = {
+        "ssl_verify_cert": False,
+        "ssl_verify_identity": False,
+        "charset": "utf8mb4",
+        "read_timeout": 60,
+        "write_timeout": 60,
+        "connect_timeout": 10
+    }
+    # Use NullPool for serverless/container environments to avoid stale connections
+    if is_cloud_run:
+        pool_class = NullPool
+        pool_size = 1
+        max_overflow = 0
+        print("ℹ️  Running in Cloud Run - using NullPool for database connections")
+
 engine = create_engine(
     DATABASE_URL, 
-    pool_pre_ping=True, 
-    pool_recycle=3600
+    connect_args=connect_args,
+    poolclass=pool_class,
+    pool_size=pool_size,
+    max_overflow=max_overflow,
+    pool_recycle=pool_recycle,
+    pool_pre_ping=True,
+    echo=False
 )
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -40,5 +73,12 @@ class Itinerary(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     owner = relationship("User", back_populates="itineraries")
 
-# Initialize tables in Cloud SQL
-Base.metadata.create_all(bind=engine)
+# Initialize tables in Cloud SQL (lazy - will run on first DB access)
+def initialize_database():
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("✓ Database tables initialized successfully")
+    except Exception as e:
+        print(f"⚠️  Database initialization error: {e}")
+
+# Don't initialize on import - lazy initialization instead

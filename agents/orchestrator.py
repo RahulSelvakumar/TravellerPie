@@ -18,16 +18,28 @@ class AgentState(TypedDict):
     destination: str
     num_days: int
 
-# 3. INITIALIZE MODEL
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash", # Use 1.5 Flash for stable hackathon performance
-    google_api_key=os.getenv("GOOGLE_API_KEY"),
-    temperature=0
-)
+# 3. INITIALIZE MODEL (Lazy - will be initialized on first use)
+_llm = None
+
+def get_llm():
+    global _llm
+    if _llm is None:
+        google_api_key = os.getenv("GOOGLE_API_KEY")
+        if not google_api_key:
+            print("⚠️  WARNING: GOOGLE_API_KEY not set. LLM calls will fail at runtime.")
+            google_api_key = "placeholder_key_for_startup"
+        
+        _llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            google_api_key=google_api_key,
+            temperature=0
+        )
+    return _llm
 
 # 4. DEFINE NODES
 async def supervisor_node(state: AgentState):
-    # Extract variables from state to prevent NameError
+    # Get LLM instance
+    llm = get_llm()
     origin = state.get("origin", "Bangalore")
     destination = state.get("destination", "Japan")
     num_days = state.get("num_days", 4)
@@ -43,11 +55,14 @@ async def supervisor_node(state: AgentState):
     - If 'gym' is a constraint, find a specific high-end gym or hotel with a 24/7 fitness center in the destination.
     - If 'minimalist' is a constraint, avoid cluttered markets; choose modern architecture.
     - Plan a {state.get('num_days')} day trip from {origin}.
-    
+
 1. Plan a trip from {origin} to {destination}.
 2. Use your knowledge to provide 3 REALISTIC flight options for May 2026.
 3. Structure JSON with airline, route, price, and link.
 4. Plan {num_days} days of activities.
+CRITICAL: You must return ONLY valid JSON. Do not include markdown code blocks.
+    The JSON keys MUST match exactly: 'morning_briefing', 'logistics', and 'days'.
+    In 'logistics', include 3 flight options with valid links.
 
 Return ONLY raw JSON:
 {{

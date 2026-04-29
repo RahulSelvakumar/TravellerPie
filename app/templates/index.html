@@ -254,20 +254,54 @@ function loadPlan(id) {
 }
 
         function renderDay(dayNum) {
-            if (!tripData) return;
-            document.getElementById('briefingText').innerText = tripData.morning_briefing;
-            document.getElementById('dayTabs').innerHTML = tripData.days.map(d => `
-                <button onclick="renderDay(${d.day_number})" class="tab-btn ${d.day_number===dayNum?'tab-active':'bg-slate-50 text-slate-400'}">DAY 0${d.day_number}</button>
-            `).join('');
-            const day = tripData.days.find(d => d.day_number === dayNum) || tripData.days[0];
-            document.getElementById('hotelNameText').innerText = day.hotel;
-            document.getElementById('itineraryDetail').innerHTML = ['morning', 'afternoon', 'evening'].map(t => `
-                <div class="flex gap-6 mt-4">
-                    <div class="w-8 h-8 bg-indigo-50 rounded flex items-center justify-center text-indigo-500"><i class="fa-solid fa-clock"></i></div>
-                    <div><span class="text-[9px] font-black uppercase text-slate-400">${t}</span><p class="font-bold text-sm">${day[t]}</p></div>
+    if (!tripData) return;
+
+    // 1. FIX: Flight Display (Checking for 'logistics' key from orchestrator.py)
+    const logistics = tripData.logistics || [];
+    const flightSection = document.getElementById('flightSection');
+    const flightList = document.getElementById('flightList');
+
+    if (logistics.length > 0) {
+        flightSection.classList.remove('hidden');
+        flightList.innerHTML = logistics.slice(0, 3).map(f => `
+            <div class="bg-slate-900 p-4 rounded-2xl text-white border border-slate-800">
+                <span class="text-[8px] font-black bg-indigo-500 px-2 py-1 rounded uppercase">${f.airline}</span>
+                <h2 class="text-sm font-black mt-2 uppercase">${f.route}</h2>
+                <p class="text-xs font-bold text-indigo-300 mt-1">${f.price}</p>
+                <a href="${f.link}" target="_blank" class="text-[9px] text-slate-400 underline mt-2 block">View Flight</a>
+            </div>
+        `).join('');
+    } else {
+        flightSection.classList.add('hidden');
+    }
+
+    // 2. FIX: Briefing Display
+    document.getElementById('briefingText').innerText = tripData.morning_briefing || "No briefing available.";
+
+    // 3. FIX: Day Tabs & Itinerary
+    if (tripData.days && Array.isArray(tripData.days)) {
+        document.getElementById('dayTabs').innerHTML = tripData.days.map(d => `
+            <button onclick="renderDay(${d.day_number})" class="tab-btn ${d.day_number === dayNum ? 'tab-active' : 'bg-slate-50 text-slate-400'}">
+                DAY 0${d.day_number}
+            </button>
+        `).join('');
+
+        const day = tripData.days.find(d => d.day_number === dayNum) || tripData.days[0];
+        document.getElementById('hotelNameText').innerText = day.hotel || "TBD";
+        
+        document.getElementById('itineraryDetail').innerHTML = ['morning', 'afternoon', 'evening'].map(t => `
+            <div class="flex gap-6 mt-4 items-start">
+                <div class="w-8 h-8 bg-indigo-50 rounded flex items-center justify-center text-indigo-500">
+                    <i class="fa-solid fa-clock"></i>
                 </div>
-            `).join('');
-        }
+                <div>
+                    <span class="text-[9px] font-black uppercase text-slate-400">${t}</span>
+                    <p class="font-bold text-sm text-slate-700">${day[t] || "Relaxing time"}</p>
+                </div>
+            </div>
+        `).join('');
+    }
+}
     </script>
 </body>
 </html>

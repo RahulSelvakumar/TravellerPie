@@ -1,6 +1,16 @@
 import sys
 import os
 
+# 1. ENSURE PATH IS SET UP CORRECTLY
+# Get the project root (parent of 'app' directory)
+current_file = os.path.abspath(__file__)
+app_dir = os.path.dirname(current_file)  # /path/to/TravellerPie/app
+project_root = os.path.dirname(app_dir)  # /path/to/TravellerPie
+
+# Add project root to sys.path so 'app', 'agents', 'tools' modules can be imported
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 # 2. CLEAN IMPORTS
 import json
 import uvicorn
@@ -9,23 +19,30 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from jose import jwt
 from passlib.context import CryptContext
 
 # These will now resolve perfectly because of step 1
-from app.database import SessionLocal, User, Itinerary
+from app.database import SessionLocal, User, Itinerary, initialize_database
 from agents.orchestrator import run_travel_agents
 
 app = FastAPI()
+
+# Initialize database tables on first use
+_db_initialized = False
+
+def ensure_db_initialized():
+    global _db_initialized
+    if not _db_initialized:
+        initialize_database()
+        _db_initialized = True
 
 # --- CONFIGURATION ---
 SECRET_KEY = os.getenv("JWT_SECRET", "rahul_2026_security_key")
 ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-import os
-from fastapi.staticfiles import StaticFiles
 
 # 1. Get the absolute path to the 'app' directory
 # Since main.py is in /code/app, this will be /code/app
@@ -34,20 +51,29 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 2. Point to the static folder inside 'app'
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
-# 3. DEBUG PRINT: This will show up in your Cloud Run logs
-print(f"DEBUG: Looking for static files in: {STATIC_DIR}")
-print(f"DEBUG: logo.png exists: {os.path.exists(os.path.join(STATIC_DIR, 'logo.png'))}")
-
-# 4. Mount WITHOUT makedirs
-# If this fails, Cloud Run will show a specific error in logs
+# 3. Mount static files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 def get_db():
+    ensure_db_initialized()
     db = SessionLocal()
-    try: yield db
-    finally: db.close()
+    try: 
+        yield db
+    except Exception as e:
+        print(f"❌ Database session error: {e}")
+        raise
+    finally: 
+        try:
+            db.close()
+        except Exception as e:
+            print(f"⚠️  Error closing database session: {e}")
 
 # --- ROUTES ---
+@app.get("/health")
+async def health():
+    """Cloud Run health check endpoint."""
+    return {"status": "ok"}
+
 @app.get("/")
 async def read_index():
     # Points to index.html inside app/templates/
@@ -58,24 +84,35 @@ async def read_index():
 
 # app/main.py
 @app.post("/register")
-async def register(data: dict, db: Session = Depends(get_db)):
-    # Explicitly pull interests from the JSON body
-    new_user = User(
-        username=data['username'],
-        hashed_password=pwd_context.hash(data['password']),
-        interests=data.get('interests', []) # Matches the key from your JS
-    )
-    db.add(new_user)
-    db.commit() # This performs the physical write to Cloud SQL
-    return {"status": "success"}
+async def register(request: Request, db: Session = Depends(get_db)):
+    try:
+        data = await request.json()
+        # Explicitly pull interests from the JSON body
+        new_user = User(
+            username=data['username'],
+            hashed_password=pwd_context.hash(data['password']),
+            interests=data.get('interests', []) # Matches the key from your JS
+        )
+        db.add(new_user)
+        db.commit() # This performs the physical write to Cloud SQL
+        return {"status": "success"}
+    except Exception as e:
+        print(f"❌ Registration error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 @app.post("/token")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == form_data.username).first()
-    if not user or not pwd_context.verify(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=400, detail="Invalid credentials")
-    token = jwt.encode({"sub": user.username}, SECRET_KEY, algorithm=ALGORITHM)
-    return {"access_token": token, "token_type": "bearer"}
+    try:
+        user = db.query(User).filter(User.username == form_data.username).first()
+        if not user or not pwd_context.verify(form_data.password, user.hashed_password):
+            raise HTTPException(status_code=400, detail="Invalid credentials")
+        token = jwt.encode({"sub": user.username}, SECRET_KEY, algorithm=ALGORITHM)
+        return {"access_token": token, "token_type": "bearer"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Login error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 @app.get("/itineraries")
 async def get_plans(request: Request, db: Session = Depends(get_db)):

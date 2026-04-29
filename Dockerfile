@@ -26,7 +26,6 @@ COPY . .
 ENV PORT=8080
 EXPOSE 8080
 
-# 8. Optimized Startup Command
-# Using shell form allows PORT to expand from the environment.
-# Cloud Run provides PORT at runtime, so this stays flexible.
-CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}
+# 8. Startup Command
+# Use direct port to test
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
