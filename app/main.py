@@ -1,35 +1,43 @@
 import sys
 import os
+import json
+import hashlib
+import uvicorn
 
-# 1. ENSURE PATH IS SET UP CORRECTLY
-# Get the project root (parent of 'app' directory)
+# 1. ENSURE MODULE RESOLUTION
+# Added to make sure 'app', 'agents', and 'tools' are discoverable in Cloud Run
 current_file = os.path.abspath(__file__)
-app_dir = os.path.dirname(current_file)  # /path/to/TravellerPie/app
-project_root = os.path.dirname(app_dir)  # /path/to/TravellerPie
+app_dir = os.path.dirname(current_file)
+project_root = os.path.dirname(app_dir)
 
-# Add project root to sys.path so 'app', 'agents', 'tools' modules can be imported
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# 2. CLEAN IMPORTS
-import json
-import uvicorn
-from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from jose import jwt
-from passlib.context import CryptContext
 
-# These will now resolve perfectly because of step 1
+# Internal project imports
 from app.database import SessionLocal, User, Itinerary, initialize_database
 from agents.orchestrator import run_travel_agents
 
-app = FastAPI()
+app = FastAPI(title="TravellerPie Global Orchestrator")
 
-# Initialize database tables on first use
+# 2. CORS MIDDLEWARE
+# Essential for preventing "Handshake Errors" when frontend and backend communicate via Cloud Run URLs
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 3. DATABASE INITIALIZATION
 _db_initialized = False
 
 def ensure_db_initialized():
@@ -37,34 +45,6 @@ def ensure_db_initialized():
     if not _db_initialized:
         initialize_database()
         _db_initialized = True
-
-# --- CONFIGURATION ---
-SECRET_KEY = os.getenv("JWT_SECRET", "rahul_2026_security_key")
-ALGORITHM = "HS256"
-# app/main.py
-import hashlib
-
-# 1. DELETE the pwd_context and CryptContext lines
-# 2. ADD these simple, stable functions
-def get_password_hash(password: str):
-    """Pure Python SHA256 hashing - no external binary dependencies."""
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def verify_password(plain_password: str, hashed_password: str):
-    """Verifies the login attempt matches the stored hash."""
-    return get_password_hash(plain_password) == hashed_password
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-# 1. Get the absolute path to the 'app' directory
-# Since main.py is in /code/app, this will be /code/app
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# 2. Point to the static folder inside 'app'
-STATIC_DIR = os.path.join(BASE_DIR, "static")
-
-# 3. Mount static files
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 def get_db():
     ensure_db_initialized()
@@ -75,54 +55,69 @@ def get_db():
         print(f"❌ Database session error: {e}")
         raise
     finally: 
-        try:
-            db.close()
-        except Exception as e:
-            print(f"⚠️  Error closing database session: {e}")
+        db.close()
+
+def get_password_hash(password: str) -> str:
+    """Hash password with PBKDF2-SHA256 + random salt (stdlib only, no bcrypt)."""
+    import secrets
+    salt = secrets.token_hex(16)
+    hashed = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260000).hex()
+    return f"{salt}:{hashed}"
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify against PBKDF2-SHA256 hash."""
+    try:
+        salt, stored_hash = hashed_password.split(":", 1)
+        candidate = hashlib.pbkdf2_hmac("sha256", plain_password.encode(), salt.encode(), 260000).hex()
+        return candidate == stored_hash
+    except Exception:
+        return False
+
+# 4. SECURITY CONFIGURATION
+SECRET_KEY = os.getenv("JWT_SECRET", "rahul_2026_security_key")
+ALGORITHM = "HS256"
+
+# 5. STATIC ASSET MAPPING
+# Uses absolute pathing to ensure the logo is found in the 'app/static' directory
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # --- ROUTES ---
+
 @app.get("/health")
 async def health():
-    """Cloud Run health check endpoint."""
     return {"status": "ok"}
 
 @app.get("/")
 async def read_index():
-    # Points to index.html inside app/templates/
     path = os.path.join(BASE_DIR, "templates", "index.html")
     if not os.path.exists(path):
-        return {"error": f"Path not found: {path}"}
+        return {"error": "Index template missing"}
     return FileResponse(path)
 
-# app/main.py
 @app.post("/register")
 async def register(request: Request, db: Session = Depends(get_db)):
     try:
         data = await request.json()
-        password = data['password']
-        
-        # FIX: Truncate password to 72 characters to satisfy bcrypt
-        safe_password = password[:72] if len(password) > 72 else password
-        
         new_user = User(
-    username=data['username'],
-    hashed_password=get_password_hash(data['password']), 
-    interests=data.get('interests', [])
-)
+            username=data['username'],
+            hashed_password=get_password_hash(data['password']), 
+            interests=data.get('interests', [])
+        )
         db.add(new_user)
         db.commit()
         return {"status": "success"}
     except Exception as e:
         print(f"❌ Registration error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Registration failed")
 
 @app.post("/token")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     try:
         user = db.query(User).filter(User.username == form_data.username).first()
-        
-        # FIX: Truncate login password to 72 chars to match the registration hash
-        safe_password = form_data.password[:72] if len(form_data.password) > 72 else form_data.password
         
         if not user or not verify_password(form_data.password, user.hashed_password):
             raise HTTPException(status_code=400, detail="Invalid credentials")
@@ -135,20 +130,18 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 
 @app.get("/itineraries")
 async def get_plans(request: Request, db: Session = Depends(get_db)):
+    # Logic to fetch archived plans from Cloud SQL
     auth_header = request.headers.get("Authorization", "")
     token = auth_header.replace("Bearer ", "")
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user = db.query(User).filter(User.username == payload.get("sub")).first()
         if not user: return []
         
-        # Fetch plans sorted by newest first
         plans = db.query(Itinerary).filter(Itinerary.user_id == user.id).order_by(Itinerary.created_at.desc()).all()
         return [{"id": p.id, "prompt": p.prompt, "plan": p.plan_data, "date": p.created_at.strftime("%Y-%m-%d")} for p in plans]
-    except:
+    except Exception as e:
         return []
-
-# Inside app/main.py
 
 @app.post("/generate")
 async def generate(request: Request, db: Session = Depends(get_db)):
@@ -157,30 +150,25 @@ async def generate(request: Request, db: Session = Depends(get_db)):
     token = auth_header.replace("Bearer ", "")
     
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user = db.query(User).filter(User.username == payload.get("sub")).first()
         
         if user:
-            # 1. CAPTURE NEW INTERESTS FROM UI
+            # Synchronize UI context engine tags with Cloud SQL profile
             ui_interests = data.get("preferences", [])
-            
-            # 2. SYNC TO DATABASE
-            # We merge current UI tags with existing DB interests
             existing_interests = set(user.interests if user.interests else [])
             updated_interests = list(existing_interests.union(set(ui_interests)))
             
             if updated_interests != user.interests:
                 user.interests = updated_interests
-                db.commit() # This physically writes to Cloud SQL
-                print(f"DEBUG: Synchronized {len(updated_interests)} interests for {user.username}")
-
-            # 3. ENSURE ORCHESTRATOR USES THESE
+                db.commit()
+            
             data["preferences"] = updated_interests
             
     except Exception as e:
         print(f"DEBUG: Auth/Sync Error: {e}")
 
-    # 4. RUN AGENTS & PERSIST ITINERARY
+    # Invoke Multi-Agent Triage
     result_str = await run_travel_agents(data)
     result_json = json.loads(result_str)
 
@@ -191,4 +179,5 @@ async def generate(request: Request, db: Session = Depends(get_db)):
     return result_json
 
 if __name__ == "__main__":
+    # Local dev entry point
     uvicorn.run("app.main:app", host="0.0.0.0", port=8080, reload=True)

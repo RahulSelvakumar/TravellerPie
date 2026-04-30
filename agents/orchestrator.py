@@ -54,12 +54,16 @@ async def supervisor_node(state: AgentState):
     RULES:
     - If 'gym' is a constraint, find a specific high-end gym or hotel with a 24/7 fitness center in the destination.
     - If 'minimalist' is a constraint, avoid cluttered markets; choose modern architecture.
+    - Ensure the hotel is suggested based on the day's activities and is located conveniently.
+    - Ensure the 'hotel' field in the JSON matches the specific hotel for that day.
     - Plan a {state.get('num_days')} day trip from {origin}.
 
 1. Plan a trip from {origin} to {destination}.
 2. Use your knowledge to provide 3 REALISTIC flight options for May 2026.
 3. Structure JSON with airline, route, price, and link.
 4. Plan {num_days} days of activities.
+5. For each day, include a hotel recommendation and 3 activities (morning, afternoon, evening).
+6. Use ONLY the information from the messages and your internal knowledge. Do NOT make up information.
 CRITICAL: You must return ONLY valid JSON. Do not include markdown code blocks.
     The JSON keys MUST match exactly: 'morning_briefing', 'logistics', and 'days'.
     In 'logistics', include 3 flight options with valid links.

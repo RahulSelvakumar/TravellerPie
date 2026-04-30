@@ -253,10 +253,10 @@ function loadPlan(id) {
     }
 }
 
-        function renderDay(dayNum) {
+function renderDay(dayNum) {
     if (!tripData) return;
 
-    // 1. FIX: Flight Display (Checking for 'logistics' key from orchestrator.py)
+    // 1. Flight Display Logic
     const logistics = tripData.logistics || [];
     const flightSection = document.getElementById('flightSection');
     const flightList = document.getElementById('flightList');
@@ -275,10 +275,10 @@ function loadPlan(id) {
         flightSection.classList.add('hidden');
     }
 
-    // 2. FIX: Briefing Display
+    // 2. Briefing Display
     document.getElementById('briefingText').innerText = tripData.morning_briefing || "No briefing available.";
 
-    // 3. FIX: Day Tabs & Itinerary
+    // 3. Day Tabs & Itinerary
     if (tripData.days && Array.isArray(tripData.days)) {
         document.getElementById('dayTabs').innerHTML = tripData.days.map(d => `
             <button onclick="renderDay(${d.day_number})" class="tab-btn ${d.day_number === dayNum ? 'tab-active' : 'bg-slate-50 text-slate-400'}">
@@ -287,7 +287,21 @@ function loadPlan(id) {
         `).join('');
 
         const day = tripData.days.find(d => d.day_number === dayNum) || tripData.days[0];
-        document.getElementById('hotelNameText').innerText = day.hotel || "TBD";
+        
+        // --- UPDATED HOTEL SECTION ---
+        // We use innerHTML instead of innerText to allow the FontAwesome icon to render
+        const hotelNameContainer = document.getElementById('hotelNameText');
+        hotelNameContainer.innerHTML = `
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-indigo-300 shadow-inner">
+                    <i class="fa-solid fa-hotel text-xl"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-black uppercase text-indigo-400 tracking-widest block mb-1">Current Residency</span>
+                    <span class="text-2xl font-bold">${day.hotel || "Luxury Accommodation"}</span>
+                </div>
+            </div>
+        `;
         
         document.getElementById('itineraryDetail').innerHTML = ['morning', 'afternoon', 'evening'].map(t => `
             <div class="flex gap-6 mt-4 items-start">
