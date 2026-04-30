@@ -20,10 +20,10 @@ graph TD
     Cron[Cloud Scheduler <br/> 5:00 AM Trigger]
     
     subgraph "The Brain (Vertex AI & LangGraph)"
-        Orchestrator{Master Concierge <br/> Gemini 1.5 Pro}
-        Transit[Transit Agent <br/> Gemini 1.5 Flash]
-        Planning[Planning Agent <br/> Gemini 1.5 Flash]
-        Intel[Local Intel Agent <br/> Gemini 1.5 Flash]
+        Orchestrator{Master Concierge <br/> Gemini 2.5 Flash}
+        Transit[Transit Agent <br/> Gemini 2.5 Flash]
+        Planning[Planning Agent <br/> Gemini 2.5 Flash]
+        Intel[Local Intel Agent <br/> Gemini 2.5 Flash]
     end
 
     subgraph "The Memory"
