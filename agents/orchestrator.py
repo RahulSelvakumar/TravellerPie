@@ -36,6 +36,26 @@ def get_llm():
         )
     return _llm
 
+async def fetch_events_node(state: AgentState):
+    """Parses the prompt for a month and calls the live search tool."""
+    from tools.mcp_server import get_live_events
+    
+    user_prompt = state['messages'][0].content
+    destination = state.get("destination", "Japan")
+    
+    # Regex to find month names in the prompt
+    months = ["january", "february", "march", "april", "may", "june", 
+              "july", "august", "september", "october", "november", "december"]
+    month_match = re.search(r'\b(' + '|'.join(months) + r')\b', user_prompt, re.I)
+    
+    # Use detected month or hardcode "May" if not found
+    target_month = month_match.group(1).capitalize() if month_match else "May"
+    
+    print(f"🔍 [Agent] Fetching live events for {destination} in {target_month}...")
+    events_json = await get_live_events(destination, target_month)
+    
+    return {"live_events": events_json}
+
 # 4. DEFINE NODES
 async def supervisor_node(state: AgentState):
     # Get LLM instance
@@ -49,8 +69,11 @@ async def supervisor_node(state: AgentState):
     constraint_block = "GENERAL TOURISM"
     if interests:
         constraint_block = f"MANDATORY: You MUST include specific activities for: {', '.join(interests)}."
+        live_events = state.get("live_events", "No specific local festivals found.")
 
     system_prompt = f"""You are the TravellerPie Lead. {constraint_block}
+     LIVE DATA FROM SEARCH AGENT:
+    {live_events}
     RULES:
     - If 'gym' is a constraint, find a specific high-end gym or hotel with a 24/7 fitness center in the destination.
     - If 'minimalist' is a constraint, avoid cluttered markets; choose modern architecture.
@@ -81,8 +104,11 @@ Return ONLY raw JSON:
 
 # 5. COMPILE GRAPH
 workflow = StateGraph(AgentState)
+workflow.add_node("FetchEvents", fetch_events_node)
 workflow.add_node("Supervisor", supervisor_node)
-workflow.set_entry_point("Supervisor")
+
+workflow.set_entry_point("FetchEvents")
+workflow.add_edge("FetchEvents", "Supervisor")
 workflow.add_edge("Supervisor", END)
 graph_app = workflow.compile()
 

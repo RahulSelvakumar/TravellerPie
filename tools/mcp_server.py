@@ -3,6 +3,8 @@ import json
 import requests
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
 
 # Initialize the MCP Server
 mcp = FastMCP("TravellerPie-Core")
@@ -42,23 +44,33 @@ def get_place_details(place_name: str) -> dict:
     except Exception as e:
         return {"error": str(e)}
 
-# --- 2. Local/Private Events Database ---
-# We keep this for 'curated' experiences that general search might miss.
+# mcp_server.py
+# Initialize the LLM with Search Grounding capability
+def get_search_agent():
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash", # Gr
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
+    )
+
 @mcp.tool()
-def get_curated_events(city: str, month: str) -> str:
-    """
-    Retrieves internal, curated local events database for specific cities.
-    """
-    db = {
-        "tokyo": {"april": [{"event": "Ueno Park Sakura Night", "type": "Cultural"}]},
-        "bengaluru": {"may": [{"event": "Indiranagar Jazz Night", "type": "Music"}]}
-    }
-    city_data = db.get(city.lower(), {})
-    events = city_data.get(month.lower())
+async def get_live_events(city: str, month: str) -> str:
+    """Fetches real-time local events using live search."""
+    search_query = f"festivals and local events in {city} during {month} 2026"
     
-    if events:
-        return json.dumps({"curated_events": events})
-    return "No curated internal events. Suggest using Google Search Grounding for live web events."
+    # FIX: Initialize the agent inside or pass it in
+    agent = get_search_agent()
+    
+    try:
+        # Using simple ainvoke to get grounded search results
+        response = await agent.ainvoke([
+            HumanMessage(content=f"Search for and list 3 specific events: {search_query}")
+        ])
+        
+        if response.content:
+            return json.dumps({"target_month": month, "live_events": response.content})
+        return f"No events found for {city} in {month}."
+    except Exception as e:
+        return f"Search Error: {str(e)}"
 
 # --- 3. Weather Fallback (Optional) ---
 # Keeping this only as a lightweight backup to Grounding.
