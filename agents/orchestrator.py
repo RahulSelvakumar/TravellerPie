@@ -102,6 +102,35 @@ Return ONLY raw JSON:
     response = await llm.ainvoke([SystemMessage(content=system_prompt)] + state['messages'])
     return {"messages": [response]}
 
+async def run_disruption_update(user_id: str, plan_id: int):
+    """
+    Backend logic to check for disruptions and patch the plan.
+    """
+    # 1. Get User Interests and Plan from DB
+    from app.database import get_db_session, UserPlan, UserPreferences
+    
+    async with get_db_session() as session:
+        plan = await session.get(UserPlan, plan_id)
+        prefs = await session.get(UserPreferences, user_id)
+        
+        # 2. Call your Search Agent for current disruptions
+        from tools.mcp_server import get_live_events
+        disruptions = await get_live_events(plan.destination, "current_weather_disruptions")
+        
+        # 3. Re-run Supervisor with 'Disruption' context
+        inputs = {
+            "messages": [HumanMessage(content=f"URGENT: Update Day 1 plan due to: {disruptions}")],
+            "preferences": prefs.tags,
+            "origin": plan.origin,
+            "destination": plan.destination,
+            "num_days": plan.num_days
+        }
+        
+        updated_json = await graph_app.ainvoke(inputs)
+        # 4. Save back to Cloud SQL (us-east1)
+        plan.json_content = updated_json["messages"][-1].content
+        await session.commit()
+
 # 5. COMPILE GRAPH
 workflow = StateGraph(AgentState)
 workflow.add_node("FetchEvents", fetch_events_node)

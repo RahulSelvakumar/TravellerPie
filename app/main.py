@@ -178,6 +178,23 @@ async def generate(request: Request, db: Session = Depends(get_db)):
 
     return result_json
 
+@app.post("/cron/sync-disruptions")
+async def handle_cron_check(request: Request):
+    # Security: Cloud Scheduler sends an OIDC token in the header
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        # In a real app, you'd iterate through all active trips
+        # For the hackathon demo, we trigger it for your test user
+        from agents.orchestrator import run_disruption_update
+        await run_disruption_update(user_id="RUPASH8754", plan_id=1)
+        
+        return {"status": "success", "message": "5AM Disruption check complete."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 if __name__ == "__main__":
     # Local dev entry point
     uvicorn.run("app.main:app", host="0.0.0.0", port=8080, reload=True)
