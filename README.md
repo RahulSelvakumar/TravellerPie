@@ -130,6 +130,10 @@ uvicorn app.main:app --reload
 ```
 Navigate to http://localhost:8000 to view the TravellerPie dashboard.
 
+### 5. Screenshots
+
+<img width="1680" height="1050" alt="Screenshot 2026-04-30 at 3 21 48 PM" src="https://github.com/user-attachments/assets/73fad8f3-808a-4249-bdae-f5a676093d75" />
+
 ## 👥 The Team
 
 Built for the Google Gen AI Academy APAC Edition Cohort 1 Hackathon.
